@@ -20,7 +20,7 @@ services:
       - gifbox
 
   # Disable Caddy when using Cloudflare Tunnel
-  # Uncomment the following to remove Caddy from the stack
-  # caddy:
-  #   deploy:
-  #     replicas: 0
+  caddy:
+    entrypoint: /bin/true
+    restart: "no"
+    ports: []

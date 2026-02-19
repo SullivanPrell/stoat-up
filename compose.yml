@@ -114,7 +114,7 @@ services:
       database:
         condition: service_healthy
       createbuckets:
-        condition: service_started
+        condition: service_completed_successfully
     volumes:
       - type: bind
         source: ./Revolt.toml

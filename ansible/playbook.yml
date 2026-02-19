@@ -133,13 +133,29 @@
 
     - name: Setup Cloudflare Tunnel configuration
       block:
-        - name: Create cloudflared config from template
-          template:
-            src: "{{ stoat_dir }}/cloudflared-config.yml.template"
-            dest: "{{ stoat_dir }}/cloudflared-config.yml"
+        - name: Copy compose.cloudflare.yml to server
+          copy:
+            src: "{{ playbook_dir }}/../compose.cloudflare.yml"
+            dest: "{{ stoat_dir }}/compose.cloudflare.yml"
             mode: '0644'
-          vars:
-            CLOUDFLARE_TUNNEL_ID: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_ID') }}"
+
+        - name: Copy cloudflared config template to server
+          copy:
+            src: "{{ playbook_dir }}/../cloudflared-config.yml.template"
+            dest: "{{ stoat_dir }}/cloudflared-config.yml.template"
+            mode: '0644'
+
+        - name: Install gettext-base for envsubst
+          apt:
+            name: gettext-base
+            state: present
+
+        - name: Create cloudflared config from template
+          shell: >
+            envsubst < {{ stoat_dir }}/cloudflared-config.yml.template
+            > {{ stoat_dir }}/cloudflared-config.yml
+          environment:
+            CLOUDFLARE_TUNNEL_ID: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_ID') | default('') }}"
             STOAT_DOMAIN: "{{ stoat_domain }}"
 
         - name: Create .cloudflared directory
@@ -153,7 +169,7 @@
             src: "{{ playbook_dir }}/../.cloudflared/credentials.json"
             dest: "{{ stoat_dir }}/.cloudflared/credentials.json"
             mode: '0600'
-          when: lookup('fileglob', playbook_dir + '/../.cloudflared/credentials.json', errors='ignore')
+          ignore_errors: yes
       when: lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool
 
     - name: Create data directories

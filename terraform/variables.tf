@@ -1,7 +1,6 @@
 variable "region" {
   description = "OCI region"
   type        = string
-  default     = "us-ashburn-1"
 }
 
 variable "tenancy_ocid" {
@@ -15,19 +14,13 @@ variable "user_ocid" {
 }
 
 variable "fingerprint" {
-  description = "Fingerprint for the key pair being used"
+  description = "Fingerprint for the API key pair"
   type        = string
 }
 
 variable "private_key_path" {
-  description = "Path to your private key"
+  description = "Absolute path to your OCI API private key (do not use ~)"
   type        = string
-}
-
-variable "config_file_profile" {
-  description = "OCI CLI config file profile"
-  type        = string
-  default     = "DEFAULT"
 }
 
 variable "compartment_ocid" {
@@ -54,15 +47,15 @@ variable "instance_shape" {
 }
 
 variable "instance_ocpus" {
-  description = "Number of OCPUs (up to 4 total across all instances on free tier)"
+  description = "Number of OCPUs (Free tier ARM: up to 4 total across all instances)"
   type        = number
   default     = 2
 }
 
 variable "instance_memory_in_gbs" {
-  description = "Amount of memory in GB (up to 24GB total across all instances on free tier)"
+  description = "Amount of memory in GB (Free tier ARM: up to 24GB total across all instances)"
   type        = number
-  default     = 12
+  default     = 6
 }
 
 variable "boot_volume_size_in_gbs" {

@@ -1,6 +1,6 @@
 # Makefile for Stoat OCI Deployment
 
-.PHONY: help init plan apply destroy ssh ansible-ping ansible-deploy clean cloudflare-setup
+.PHONY: help init plan apply destroy ssh ansible-ping ansible-deploy wait-for-ssh clean cloudflare-setup
 
 # Load environment variables from .env file if it exists
 -include .env
@@ -17,7 +17,7 @@ help: ## Show this help message
 	@echo 'Usage: make [target]'
 	@echo ''
 	@echo 'Available targets:'
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # Terraform targets
 init: ## Initialize Terraform
@@ -37,15 +37,15 @@ output: ## Show Terraform outputs
 
 # Ansible targets
 ansible-ping: ## Test Ansible connectivity
-	cd $(ANSIBLE_DIR) && ansible stoat -m ping --private-key $(SSH_KEY)
+	cd $(ANSIBLE_DIR) && env LC_ALL=C.UTF-8 LANG=C.UTF-8 ansible stoat -m ping --private-key $(SSH_KEY)
 
 ansible-deploy: ## Deploy Stoat with Ansible
-	cd $(ANSIBLE_DIR) && ansible-playbook playbook.yml \
+	cd $(ANSIBLE_DIR) && env LC_ALL=C.UTF-8 LANG=C.UTF-8 ansible-playbook playbook.yml \
 		--private-key $(SSH_KEY) \
 		-e "domain_name=$(DOMAIN)"
 
 ansible-update: ## Update Stoat application
-	cd $(ANSIBLE_DIR) && ansible-playbook playbook.yml \
+	cd $(ANSIBLE_DIR) && env LC_ALL=C.UTF-8 LANG=C.UTF-8 ansible-playbook playbook.yml \
 		--private-key $(SSH_KEY) \
 		-e "domain_name=$(DOMAIN)" \
 		--tags update
@@ -73,8 +73,23 @@ setup: ## Setup configuration files from examples
 		echo ".env file exists - configuration loaded"; \
 	fi
 
+# Wait for instance to be reachable
+wait-for-ssh: ## Wait for SSH to become available on the instance
+	@echo "Waiting for instance to become reachable via SSH (this may take 2-5 minutes)..."
+	@IP=$$(cd $(TERRAFORM_DIR) && terraform output -raw instance_public_ip) && \
+	for i in $$(seq 1 30); do \
+		if ssh -i $(SSH_KEY) -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes ubuntu@$$IP "echo ok" >/dev/null 2>&1; then \
+			echo "Instance is reachable!"; \
+			exit 0; \
+		fi; \
+		echo "  Attempt $$i/30 - waiting 10s..."; \
+		sleep 10; \
+	done; \
+	echo "ERROR: Instance not reachable after 5 minutes"; \
+	exit 1
+
 # Full deployment
-deploy: init apply ansible-deploy ## Full deployment (Terraform + Ansible)
+deploy: init apply wait-for-ssh ansible-deploy ## Full deployment (Terraform + Ansible)
 	@echo "Deployment complete!"
 	@echo "Access your Stoat instance at: https://$(DOMAIN)"
 
