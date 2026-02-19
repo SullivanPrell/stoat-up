@@ -1,0 +1,21 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - git
+  - curl
+  - ca-certificates
+
+hostname: ${hostname}
+
+runcmd:
+  # Set hostname
+  - hostnamectl set-hostname ${hostname}
+  - echo "127.0.0.1 ${hostname}" >> /etc/hosts
+  
+  # Basic security: disable password authentication
+  - sed -E -i 's|^#?(PasswordAuthentication)\s.*|\1 no|' /etc/ssh/sshd_config
+  - systemctl restart sshd
+  
+  # Note: Docker and application setup will be handled by Ansible

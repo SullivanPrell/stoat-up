@@ -1,0 +1,156 @@
+---
+- name: Deploy Stoat on OCI
+  hosts: stoat
+  become: yes
+  vars:
+    stoat_domain: "{{ domain_name | default('stoat.example.com') }}"
+    stoat_dir: "/opt/stoat"
+    
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        autoremove: yes
+        autoclean: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - git
+          - ufw
+          - fail2ban
+        state: present
+
+    - name: Configure UFW - Allow SSH
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+
+    - name: Configure UFW - Allow HTTP
+      ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+
+    - name: Configure UFW - Allow HTTPS
+      ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+
+    - name: Configure UFW - Set default deny
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: Start and enable fail2ban
+      systemd:
+        name: fail2ban
+        state: started
+        enabled: yes
+
+    - name: Create Docker keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create Stoat directory
+      file:
+        path: "{{ stoat_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Clone Stoat repository
+      git:
+        repo: https://github.com/SullivanPrell/stoat-up.git
+        dest: "{{ stoat_dir }}"
+        version: main
+        force: yes
+
+    - name: Generate Stoat configuration
+      command: bash {{ stoat_dir }}/generate_config.sh {{ stoat_domain }}
+      args:
+        chdir: "{{ stoat_dir }}"
+        creates: "{{ stoat_dir }}/Revolt.toml"
+
+    - name: Create data directories
+      file:
+        path: "{{ stoat_dir }}/data/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - db
+        - rabbit
+        - minio
+        - caddy-data
+        - caddy-config
+
+    - name: Start Stoat services
+      command: docker compose up -d
+      args:
+        chdir: "{{ stoat_dir }}"
+      environment:
+        COMPOSE_PROJECT_NAME: stoat
+
+    - name: Wait for services to be healthy
+      pause:
+        seconds: 30
+
+    - name: Display service status
+      command: docker compose ps
+      args:
+        chdir: "{{ stoat_dir }}"
+      register: docker_ps_output
+
+    - name: Show Docker Compose status
+      debug:
+        var: docker_ps_output.stdout_lines
+
+    - name: Display deployment information
+      debug:
+        msg:
+          - "Stoat has been deployed successfully!"
+          - "Domain: https://{{ stoat_domain }}"
+          - "Configuration file: {{ stoat_dir }}/Revolt.toml"
+          - "To check logs: cd {{ stoat_dir }} && docker compose logs -f"
+          - "To restart: cd {{ stoat_dir }} && docker compose restart"
+          - "To update: cd {{ stoat_dir }} && git pull && docker compose pull && docker compose up -d"

@@ -15,6 +15,18 @@ Self-hosting Stoat using Docker
 
 This repository contains configurations and instructions that can be used for deploying a full instance of Stoat, including the back-end, web front-end, file server, and metadata and image proxy.
 
+## 🚀 Deploy to Oracle Cloud Infrastructure (OCI) Free Tier
+
+**New!** This fork includes automated deployment to OCI free tier using Terraform, Docker Compose, and Ansible.
+
+👉 **[See DEPLOYMENT.md for OCI deployment instructions](DEPLOYMENT.md)**
+
+Quick deploy:
+```bash
+cd terraform && terraform init && terraform apply
+cd ../ansible && ansible-playbook playbook.yml -e "domain_name=your.domain.com"
+```
+
 > [!WARNING]
 > If you are updating an instance from before November 28, 2024, please consult the [notices section](#notices) at the bottom.
 
@@ -32,6 +44,7 @@ This repository contains configurations and instructions that can be used for de
 
 ## Table of Contents
 
+- [🚀 OCI Free Tier Deployment](#-deploy-to-oracle-cloud-infrastructure-oci-free-tier)
 - [Deployment](#deployment)
 - [Updating](#updating)
 - [Advanced Deployment](#advanced-deployment)
