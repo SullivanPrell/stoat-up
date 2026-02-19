@@ -7,6 +7,9 @@ This guide provides step-by-step instructions for deploying Stoat to OCI Free Ti
 - [Prerequisites](#prerequisites)
 - [Architecture Overview](#architecture-overview)
 - [Quick Start](#quick-start)
+- [Deployment Options](#deployment-options)
+  - [Option A: Traditional Caddy (HTTPS)](#option-a-traditional-caddy-https)
+  - [Option B: Cloudflare Tunnel (Recommended)](#option-b-cloudflare-tunnel-recommended)
 - [Detailed Setup](#detailed-setup)
   - [1. OCI Account Setup](#1-oci-account-setup)
   - [2. Configure OCI CLI](#2-configure-oci-cli)
@@ -15,6 +18,7 @@ This guide provides step-by-step instructions for deploying Stoat to OCI Free Ti
   - [5. Deploy Infrastructure](#5-deploy-infrastructure)
   - [6. Configure DNS](#6-configure-dns)
   - [7. Deploy Application](#7-deploy-application)
+- [Cloudflare Tunnel Setup](#cloudflare-tunnel-setup)
 - [Management](#management)
 - [Troubleshooting](#troubleshooting)
 - [Cost Optimization](#cost-optimization)
@@ -39,8 +43,28 @@ This deployment uses:
 - **Terraform**: Provisions OCI infrastructure (VCN, compute instance, security lists)
 - **Docker Compose**: Orchestrates Stoat services (database, API, web, etc.)
 - **Ansible**: Configures the server and deploys the application
-- **Caddy**: Handles reverse proxy and automatic HTTPS
+- **Caddy**: Handles reverse proxy and automatic HTTPS (Option A)
+- **Cloudflare Tunnel**: Zero-port-exposure deployment with automatic SSL and DNS (Option B)
 - **.env File**: Centralized configuration for all deployment variables
+
+### Deployment Options
+
+You can deploy Stoat in two ways:
+
+**Option A: Traditional Caddy Setup**
+- Exposes ports 80 and 443
+- Uses Let's Encrypt for SSL
+- Manual DNS configuration
+- Simpler setup
+
+**Option B: Cloudflare Tunnel** (Recommended)
+- **No ports exposed** - More secure
+- **Automatic SSL** via Cloudflare
+- **Automatic DNS** configuration
+- **DDoS protection** included
+- **Hidden origin IP**
+
+👉 **[Full Cloudflare Tunnel Guide](CLOUDFLARE_TUNNEL.md)**
 
 ### OCI Free Tier Resources
 
@@ -52,6 +76,8 @@ This setup is designed to fit within OCI's Always Free tier:
 - **Networking**: 1 VCN with 1 subnet
 
 ## Quick Start
+
+**Traditional Caddy Setup:**
 
 ```bash
 # Clone the repository
@@ -69,24 +95,69 @@ make setup
 make deploy
 ```
 
-Or manually:
+**Cloudflare Tunnel Setup** (No port exposure):
 
 ```bash
-# Configure environment
-cp .env.example .env
-# Edit .env with your OCI credentials and settings
+# Clone the repository
+git clone https://github.com/SullivanPrell/stoat-up.git
+cd stoat-up
 
-# Deploy infrastructure
-source .env
-cd terraform
-terraform init
-terraform plan
-terraform apply
+# Setup configuration
+make setup
+# Edit .env with your values AND Cloudflare credentials
 
-# Deploy application
-cd ../ansible
-ansible-playbook playbook.yml
+# Setup Cloudflare Tunnel
+make cloudflare-setup
+
+# Enable Cloudflare in .env
+# Set: USE_CLOUDFLARE_TUNNEL=true
+
+# Deploy infrastructure and application
+make deploy
 ```
+
+## Deployment Options
+
+### Option A: Traditional Caddy (HTTPS)
+
+**Pros:**
+- Simple setup
+- Full control over SSL certificates
+- No third-party dependencies
+- Works with any DNS provider
+
+**Cons:**
+- Requires ports 80/443 exposed
+- Public server IP
+- Manual DNS configuration
+
+**Use when:**
+- You prefer simpler setup
+- You don't use Cloudflare
+- You want full control
+
+### Option B: Cloudflare Tunnel (Recommended)
+
+**Pros:**
+- ✅ **Zero port exposure** - No inbound ports needed
+- ✅ **Automatic SSL** - Cloudflare manages certificates
+- ✅ **Automatic DNS** - Configured via API
+- ✅ **DDoS protection** - Built-in protection
+- ✅ **Hidden origin** - Your server IP is not exposed
+- ✅ **Better security** - Outbound-only connections
+
+**Cons:**
+- Requires Cloudflare account
+- Slightly more complex initial setup
+- All traffic goes through Cloudflare
+
+**Use when:**
+- You value security and want zero port exposure
+- Your ISP blocks ports 80/443
+- You use Cloudflare for DNS
+- You want built-in DDoS protection
+
+👉 **[Complete Cloudflare Tunnel Guide](CLOUDFLARE_TUNNEL.md)**
 
 ## Detailed Setup
 
@@ -279,6 +350,66 @@ With infrastructure ready and DNS configured:
 3. Wait for deployment (5-10 minutes)
 
 4. Access your Stoat instance at `https://your.domain.com`
+
+## Cloudflare Tunnel Setup
+
+If you want to use Cloudflare Tunnel instead of traditional Caddy setup:
+
+### Quick Cloudflare Setup
+
+```bash
+# 1. Add Cloudflare credentials to .env
+CLOUDFLARE_API_TOKEN=your_token_here
+CLOUDFLARE_ACCOUNT_ID=your_account_id
+CLOUDFLARE_ZONE_ID=your_zone_id
+
+# 2. Run setup script
+make cloudflare-setup
+
+# 3. Enable Cloudflare Tunnel
+# Edit .env: USE_CLOUDFLARE_TUNNEL=true
+
+# 4. Deploy (or redeploy if already deployed)
+make ansible-deploy
+```
+
+### Benefits of Cloudflare Tunnel
+
+- **Zero Port Exposure**: No need to open ports 80/443
+- **Automatic SSL**: Cloudflare manages all certificates
+- **Automatic DNS**: DNS records created automatically
+- **DDoS Protection**: Built-in Cloudflare protection
+- **Hidden Origin IP**: Your server IP is not exposed
+
+### Getting Cloudflare Credentials
+
+1. **API Token** (https://dash.cloudflare.com/profile/api-tokens):
+   - Create token with "Edit Cloudflare Tunnel" template
+   - Or custom with: Account→Cloudflare Tunnel→Edit, Zone→DNS→Edit
+
+2. **Account ID & Zone ID**:
+   - Go to Cloudflare Dashboard
+   - Select your domain
+   - Find both IDs in the right sidebar on Overview page
+
+### Firewall Configuration with Cloudflare
+
+When using Cloudflare Tunnel, you **don't need** to open ports 80/443:
+
+```bash
+# Only SSH is needed
+sudo ufw allow 22/tcp
+sudo ufw default deny incoming
+sudo ufw enable
+```
+
+The tunnel creates an outbound connection to Cloudflare's network.
+
+### Complete Guide
+
+For detailed Cloudflare Tunnel setup, troubleshooting, and advanced configuration:
+
+👉 **[See CLOUDFLARE_TUNNEL.md](CLOUDFLARE_TUNNEL.md)**
 
 ## Management
 

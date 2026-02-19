@@ -34,13 +34,24 @@ make setup          # Creates .env from example
 make deploy         # Deploys infrastructure and application
 ```
 
+**Optional: Use Cloudflare Tunnel** for zero-port-exposure deployment:
+```bash
+# Setup Cloudflare Tunnel (automatic SSL + DNS)
+make cloudflare-setup
+# Enable in .env: USE_CLOUDFLARE_TUNNEL=true
+# Deploy as normal
+
+👉 **[See CLOUDFLARE_TUNNEL.md for Cloudflare setup](CLOUDFLARE_TUNNEL.md)**
+```
+
 **Key Features:**
 - ✅ Centralized configuration via `.env` file
 - ✅ One-command deployment with Make
 - ✅ Automated infrastructure provisioning (Terraform)
 - ✅ Automated server configuration (Ansible)
 - ✅ Free tier optimized (ARM or x86)
-- ✅ Automatic SSL with Caddy
+- ✅ Automatic SSL with Caddy **OR** Cloudflare Tunnel
+- ✅ Cloudflare Tunnel support (no port exposure, auto DNS)
 - ✅ Security hardening included
 
 **Quick Reference:** [QUICK_REFERENCE.md](QUICK_REFERENCE.md)

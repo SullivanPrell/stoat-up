@@ -1,6 +1,6 @@
 # Makefile for Stoat OCI Deployment
 
-.PHONY: help init plan apply destroy ssh ansible-ping ansible-deploy clean
+.PHONY: help init plan apply destroy ssh ansible-ping ansible-deploy clean cloudflare-setup
 
 # Load environment variables from .env file if it exists
 -include .env
@@ -11,6 +11,7 @@ TERRAFORM_DIR := terraform
 ANSIBLE_DIR := ansible
 SSH_KEY ?= $(ANSIBLE_SSH_PRIVATE_KEY)
 DOMAIN ?= $(STOAT_DOMAIN)
+USE_CF_TUNNEL ?= $(USE_CLOUDFLARE_TUNNEL)
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -100,3 +101,26 @@ check-env: ## Check if .env file exists and is configured
 		exit 1; \
 	fi
 	@echo ".env file is configured"
+
+# Cloudflare Tunnel targets
+cloudflare-setup: ## Setup Cloudflare Tunnel (run this before deploying with Cloudflare)
+	./setup-cloudflare-tunnel.sh
+
+cloudflare-info: ## Show Cloudflare Tunnel information
+	@if [ -z "$(CLOUDFLARE_TUNNEL_ID)" ]; then \
+		echo "Cloudflare Tunnel not configured"; \
+		echo "Run 'make cloudflare-setup' first"; \
+	else \
+		echo "Tunnel ID: $(CLOUDFLARE_TUNNEL_ID)"; \
+		echo "Tunnel Name: $(CLOUDFLARE_TUNNEL_NAME)"; \
+		echo "Domain: $(STOAT_DOMAIN)"; \
+		cloudflared tunnel info $(CLOUDFLARE_TUNNEL_ID) 2>/dev/null || true; \
+	fi
+
+cloudflare-delete: ## Delete Cloudflare Tunnel
+	@if [ -n "$(CLOUDFLARE_TUNNEL_ID)" ]; then \
+		cloudflared tunnel delete $(CLOUDFLARE_TUNNEL_ID); \
+		echo "Tunnel deleted. Please update .env file."; \
+	else \
+		echo "No tunnel configured in .env"; \
+	fi

@@ -93,6 +93,25 @@
         state: started
         enabled: yes
 
+    - name: Install cloudflared (if using Cloudflare Tunnel)
+      block:
+        - name: Download cloudflared package
+          get_url:
+            url: "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}.deb"
+            dest: /tmp/cloudflared.deb
+            mode: '0644'
+
+        - name: Install cloudflared
+          apt:
+            deb: /tmp/cloudflared.deb
+            state: present
+
+        - name: Remove cloudflared package file
+          file:
+            path: /tmp/cloudflared.deb
+            state: absent
+      when: lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool
+
     - name: Create Stoat directory
       file:
         path: "{{ stoat_dir }}"
@@ -112,6 +131,31 @@
         chdir: "{{ stoat_dir }}"
         creates: "{{ stoat_dir }}/Revolt.toml"
 
+    - name: Setup Cloudflare Tunnel configuration
+      block:
+        - name: Create cloudflared config from template
+          template:
+            src: "{{ stoat_dir }}/cloudflared-config.yml.template"
+            dest: "{{ stoat_dir }}/cloudflared-config.yml"
+            mode: '0644'
+          vars:
+            CLOUDFLARE_TUNNEL_ID: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_ID') }}"
+            STOAT_DOMAIN: "{{ stoat_domain }}"
+
+        - name: Create .cloudflared directory
+          file:
+            path: "{{ stoat_dir }}/.cloudflared"
+            state: directory
+            mode: '0755'
+
+        - name: Copy Cloudflare credentials (if exists locally)
+          copy:
+            src: "{{ playbook_dir }}/../.cloudflared/credentials.json"
+            dest: "{{ stoat_dir }}/.cloudflared/credentials.json"
+            mode: '0600'
+          when: lookup('fileglob', playbook_dir + '/../.cloudflared/credentials.json', errors='ignore')
+      when: lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool
+
     - name: Create data directories
       file:
         path: "{{ stoat_dir }}/data/{{ item }}"
@@ -130,6 +174,18 @@
         chdir: "{{ stoat_dir }}"
       environment:
         COMPOSE_PROJECT_NAME: stoat
+      when: not (lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool)
+
+    - name: Start Stoat services with Cloudflare Tunnel
+      command: docker compose -f compose.yml -f compose.cloudflare.yml up -d
+      args:
+        chdir: "{{ stoat_dir }}"
+      environment:
+        COMPOSE_PROJECT_NAME: stoat
+        CLOUDFLARE_TUNNEL_TOKEN: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_TOKEN') }}"
+        CLOUDFLARE_TUNNEL_ID: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_ID') }}"
+        STOAT_DOMAIN: "{{ stoat_domain }}"
+      when: lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool
 
     - name: Wait for services to be healthy
       pause:
@@ -149,8 +205,9 @@
       debug:
         msg:
           - "Stoat has been deployed successfully!"
-          - "Domain: https://{{ stoat_domain }}"
+          - "Domain: {{ 'https://' + stoat_domain if not (lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool) else stoat_domain }}"
           - "Configuration file: {{ stoat_dir }}/Revolt.toml"
+          - "{{ 'Using Cloudflare Tunnel - No ports exposed!' if (lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool) else 'Using Caddy for HTTPS' }}"
           - "To check logs: cd {{ stoat_dir }} && docker compose logs -f"
           - "To restart: cd {{ stoat_dir }} && docker compose restart"
           - "To update: cd {{ stoat_dir }} && git pull && docker compose pull && docker compose up -d"
