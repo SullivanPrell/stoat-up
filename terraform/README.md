@@ -7,35 +7,70 @@ This directory contains Terraform configuration to provision infrastructure on O
 - `main.tf` - Main Terraform configuration (VCN, compute instance, security)
 - `variables.tf` - Variable definitions
 - `outputs.tf` - Output values (IP address, instance ID, etc.)
-- `terraform.tfvars.example` - Example variables file
+- `terraform.tfvars.example` - Example variables file (deprecated - use .env instead)
 - `cloud-init.yaml` - Cloud-init configuration for instance
 - `inventory.tpl` - Template for Ansible inventory file
 
 ## Quick Start
 
-1. Copy the example variables file:
-   ```bash
-   cp terraform.tfvars.example terraform.tfvars
-   ```
+**Recommended: Use the .env file approach**
 
-2. Edit `terraform.tfvars` with your OCI credentials and settings
+From the repository root:
 
-3. Initialize Terraform:
-   ```bash
-   terraform init
-   ```
+```bash
+# 1. Setup configuration
+make setup
+# Edit .env with your values
 
-4. Review the plan:
-   ```bash
-   terraform plan
-   ```
+# 2. Validate
+./validate-env.sh
 
-5. Apply the configuration:
-   ```bash
-   terraform apply
-   ```
+# 3. Deploy
+make init
+make plan
+make apply
+```
 
-## OCI Free Tier Configuration
+**Alternative: Manual approach**
+
+```bash
+# 1. Load environment variables
+source ../.env
+
+# 2. Initialize Terraform
+terraform init
+
+# 3. Review the plan
+terraform plan
+
+# 4. Apply the configuration
+terraform apply
+```
+
+## Configuration
+
+All configuration is done via environment variables using the `.env` file in the repository root.
+
+Terraform reads variables prefixed with `TF_VAR_`. For example:
+- `.env` contains: `TF_VAR_region=us-ashburn-1`
+- Terraform uses: `var.region`
+
+### Required Environment Variables
+
+See `.env.example` for the complete list. Key variables:
+
+- `TF_VAR_region` - OCI region
+- `TF_VAR_tenancy_ocid` - Your tenancy OCID
+- `TF_VAR_user_ocid` - Your user OCID
+- `TF_VAR_fingerprint` - API key fingerprint
+- `TF_VAR_private_key_path` - Path to OCI API private key
+- `TF_VAR_compartment_ocid` - Compartment OCID
+- `TF_VAR_ssh_public_key` - SSH public key for instance
+- `TF_VAR_domain_name` - Domain for your Stoat instance
+
+### Legacy Configuration (terraform.tfvars)
+
+The `terraform.tfvars.example` file is provided for reference but is no longer the recommended approach. Use the `.env` file instead.
 
 This configuration is optimized for OCI's Always Free tier:
 

@@ -2,11 +2,15 @@
 
 .PHONY: help init plan apply destroy ssh ansible-ping ansible-deploy clean
 
+# Load environment variables from .env file if it exists
+-include .env
+export
+
 # Variables
 TERRAFORM_DIR := terraform
 ANSIBLE_DIR := ansible
-SSH_KEY ?= ~/.ssh/stoat_oci_rsa
-DOMAIN ?= stoat.example.com
+SSH_KEY ?= $(ANSIBLE_SSH_PRIVATE_KEY)
+DOMAIN ?= $(STOAT_DOMAIN)
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -60,13 +64,12 @@ restart: ## Restart Stoat services
 
 # Setup targets
 setup: ## Setup configuration files from examples
-	@if [ ! -f $(TERRAFORM_DIR)/terraform.tfvars ]; then \
-		cp $(TERRAFORM_DIR)/terraform.tfvars.example $(TERRAFORM_DIR)/terraform.tfvars; \
-		echo "Created $(TERRAFORM_DIR)/terraform.tfvars - please edit it with your values"; \
-	fi
-	@if [ ! -f $(ANSIBLE_DIR)/vars.yml ]; then \
-		cp $(ANSIBLE_DIR)/vars.yml.example $(ANSIBLE_DIR)/vars.yml; \
-		echo "Created $(ANSIBLE_DIR)/vars.yml - please edit it with your values"; \
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "Created .env - please edit it with your values"; \
+		echo "Run 'make setup' again after configuring .env"; \
+	else \
+		echo ".env file exists - configuration loaded"; \
 	fi
 
 # Full deployment
@@ -84,3 +87,16 @@ clean: ## Clean Terraform files
 validate: ## Validate Terraform and Ansible configurations
 	cd $(TERRAFORM_DIR) && terraform validate
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook.yml --syntax-check
+
+check-env: ## Check if .env file exists and is configured
+	@if [ ! -f .env ]; then \
+		echo "ERROR: .env file not found!"; \
+		echo "Run 'make setup' to create it from .env.example"; \
+		exit 1; \
+	fi
+	@if grep -q "example.com" .env; then \
+		echo "WARNING: .env file contains example values!"; \
+		echo "Please edit .env with your actual configuration"; \
+		exit 1; \
+	fi
+	@echo ".env file is configured"

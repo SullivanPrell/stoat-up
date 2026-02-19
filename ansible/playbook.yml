@@ -3,8 +3,8 @@
   hosts: stoat
   become: yes
   vars:
-    stoat_domain: "{{ domain_name | default('stoat.example.com') }}"
-    stoat_dir: "/opt/stoat"
+    stoat_domain: "{{ lookup('env', 'STOAT_DOMAIN') | default(domain_name | default('stoat.example.com')) }}"
+    stoat_dir: "{{ lookup('env', 'STOAT_DIR') | default('/opt/stoat') }}"
     
   tasks:
     - name: Update apt cache

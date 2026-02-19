@@ -11,7 +11,7 @@ This guide provides step-by-step instructions for deploying Stoat to OCI Free Ti
   - [1. OCI Account Setup](#1-oci-account-setup)
   - [2. Configure OCI CLI](#2-configure-oci-cli)
   - [3. Generate SSH Keys](#3-generate-ssh-keys)
-  - [4. Configure Terraform](#4-configure-terraform)
+  - [4. Configure Environment Variables](#4-configure-environment-variables)
   - [5. Deploy Infrastructure](#5-deploy-infrastructure)
   - [6. Configure DNS](#6-configure-dns)
   - [7. Deploy Application](#7-deploy-application)
@@ -30,6 +30,7 @@ Before you begin, ensure you have:
    - [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) (>= 2.9)
    - SSH client
    - Git
+   - Make (optional, for convenience commands)
 
 ## Architecture Overview
 
@@ -39,6 +40,7 @@ This deployment uses:
 - **Docker Compose**: Orchestrates Stoat services (database, API, web, etc.)
 - **Ansible**: Configures the server and deploys the application
 - **Caddy**: Handles reverse proxy and automatic HTTPS
+- **.env File**: Centralized configuration for all deployment variables
 
 ### OCI Free Tier Resources
 
@@ -56,19 +58,34 @@ This setup is designed to fit within OCI's Always Free tier:
 git clone https://github.com/SullivanPrell/stoat-up.git
 cd stoat-up
 
-# Configure Terraform
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your OCI credentials
+# Setup configuration
+make setup
+# Edit .env with your values
+
+# Validate configuration
+./validate-env.sh
+
+# Deploy infrastructure and application
+make deploy
+```
+
+Or manually:
+
+```bash
+# Configure environment
+cp .env.example .env
+# Edit .env with your OCI credentials and settings
 
 # Deploy infrastructure
+source .env
+cd terraform
 terraform init
 terraform plan
 terraform apply
 
-# Deploy application with Ansible
+# Deploy application
 cd ../ansible
-ansible-playbook playbook.yml -e "domain_name=your.domain.com"
+ansible-playbook playbook.yml
 ```
 
 ## Detailed Setup
@@ -124,65 +141,90 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/stoat_oci_rsa -C "stoat-oci"
 chmod 600 ~/.ssh/stoat_oci_rsa
 ```
 
-### 4. Configure Terraform
+Copy your public key (you'll need this for the .env file):
 
-1. Navigate to the terraform directory:
+```bash
+cat ~/.ssh/stoat_oci_rsa.pub
+```
+
+### 4. Configure Environment Variables
+
+All deployment configuration is managed through a single `.env` file.
+
+1. Copy the example file:
    ```bash
-   cd terraform
+   cp .env.example .env
    ```
 
-2. Copy the example variables file:
+2. Edit `.env` with your values:
    ```bash
-   cp terraform.tfvars.example terraform.tfvars
+   # Use your preferred editor
+   nano .env
+   # or
+   vim .env
    ```
 
-3. Edit `terraform.tfvars` with your values:
-   ```hcl
-   # OCI Configuration
-   region           = "us-ashburn-1"  # Your OCI region
-   tenancy_ocid     = "ocid1.tenancy.oc1..aaaaa..."
-   user_ocid        = "ocid1.user.oc1..aaaaa..."
-   fingerprint      = "aa:bb:cc:dd:..."
-   private_key_path = "~/.oci/oci_api_key.pem"
-   compartment_ocid = "ocid1.compartment.oc1..aaaaa..."
+3. Fill in all required values:
+
+   ```bash
+   # OCI Credentials (from step 2)
+   TF_VAR_region=us-ashburn-1
+   TF_VAR_tenancy_ocid=ocid1.tenancy.oc1..aaaaa...
+   TF_VAR_user_ocid=ocid1.user.oc1..aaaaa...
+   TF_VAR_fingerprint=aa:bb:cc:...
+   TF_VAR_private_key_path=~/.oci/oci_api_key.pem
+   TF_VAR_compartment_ocid=ocid1.compartment.oc1..aaaaa...
    
-   # SSH Configuration
-   ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2E... stoat-oci"
+   # SSH Configuration (from step 3)
+   TF_VAR_ssh_public_key=ssh-rsa AAAAB3NzaC1yc2E... stoat-oci
+   ANSIBLE_SSH_PRIVATE_KEY=~/.ssh/stoat_oci_rsa
    
    # Stoat Configuration
-   domain_name = "stoat.example.com"
+   TF_VAR_domain_name=stoat.example.com
+   STOAT_DOMAIN=stoat.example.com
    
-   # Instance Configuration (Free Tier)
-   instance_shape          = "VM.Standard.A1.Flex"
-   instance_ocpus          = 2
-   instance_memory_in_gbs  = 12
-   boot_volume_size_in_gbs = "50"
+   # Instance Configuration (adjust as needed)
+   TF_VAR_instance_shape=VM.Standard.A1.Flex
+   TF_VAR_instance_ocpus=2
+   TF_VAR_instance_memory_in_gbs=12
    ```
 
-   **Note**: To use your SSH public key, run:
+4. Validate your configuration:
    ```bash
-   cat ~/.ssh/stoat_oci_rsa.pub
+   ./validate-env.sh
    ```
+
+   This script will:
+   - Check all required variables are set
+   - Verify SSH keys exist
+   - Warn about example values
+   - Check file permissions
 
 ### 5. Deploy Infrastructure
 
-1. Initialize Terraform:
+With your `.env` file configured:
+
+1. Load environment variables:
    ```bash
+   source .env
+   ```
+
+   Or if using Make (recommended):
+   ```bash
+   make init     # Initialize Terraform
+   make plan     # Preview changes
+   make apply    # Create infrastructure
+   ```
+
+   Manual Terraform commands:
+   ```bash
+   cd terraform
    terraform init
-   ```
-
-2. Review the deployment plan:
-   ```bash
    terraform plan
-   ```
-
-3. Apply the configuration:
-   ```bash
    terraform apply
    ```
-   Type `yes` when prompted.
 
-4. Note the output values:
+2. Note the output values:
    ```
    instance_public_ip = "xxx.xxx.xxx.xxx"
    ssh_command = "ssh ubuntu@xxx.xxx.xxx.xxx"
@@ -209,40 +251,68 @@ Point your domain to the instance IP address:
 
 ### 7. Deploy Application
 
-1. Navigate to the ansible directory:
+With infrastructure ready and DNS configured:
+
+1. Ensure `.env` is loaded:
    ```bash
-   cd ../ansible
+   source .env
    ```
 
-2. The inventory file should have been auto-generated by Terraform. If not, create it:
+2. Deploy with Ansible using Make:
    ```bash
-   cp inventory.ini.example inventory.ini
-   # Edit with your instance IP
+   make ansible-deploy
    ```
 
-3. Test Ansible connectivity:
+   Or manually:
    ```bash
-   ansible stoat -m ping -i inventory.ini --private-key ~/.ssh/stoat_oci_rsa
+   cd ansible
+   ansible-playbook playbook.yml
    ```
 
-4. Run the playbook:
-   ```bash
-   ansible-playbook playbook.yml \
-     -i inventory.ini \
-     --private-key ~/.ssh/stoat_oci_rsa \
-     -e "domain_name=your.domain.com"
-   ```
+   The playbook will:
+   - Update the system
+   - Configure firewall
+   - Install Docker
+   - Clone and deploy Stoat
+   - Configure SSL with Caddy
 
-5. Wait for deployment to complete (5-10 minutes)
+3. Wait for deployment (5-10 minutes)
 
-6. Access your Stoat instance at `https://your.domain.com`
+4. Access your Stoat instance at `https://your.domain.com`
 
 ## Management
+
+### Using Make Commands
+
+The easiest way to manage your deployment is using the Makefile:
+
+```bash
+# View all available commands
+make help
+
+# SSH into the instance
+make ssh
+
+# View service logs
+make logs
+
+# Check service status
+make status
+
+# Restart services
+make restart
+
+# Update Stoat
+make ansible-update
+```
 
 ### Check Service Status
 
 SSH into your instance:
 ```bash
+source .env
+make ssh
+# or manually:
 ssh -i ~/.ssh/stoat_oci_rsa ubuntu@<instance-ip>
 ```
 

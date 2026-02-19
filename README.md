@@ -19,13 +19,31 @@ This repository contains configurations and instructions that can be used for de
 
 **New!** This fork includes automated deployment to OCI free tier using Terraform, Docker Compose, and Ansible.
 
-👉 **[See DEPLOYMENT.md for OCI deployment instructions](DEPLOYMENT.md)**
+👉 **[See DEPLOYMENT.md for complete deployment guide](DEPLOYMENT.md)**
 
-Quick deploy:
+Quick deploy with centralized `.env` configuration:
 ```bash
-cd terraform && terraform init && terraform apply
-cd ../ansible && ansible-playbook playbook.yml -e "domain_name=your.domain.com"
+# Setup
+make setup          # Creates .env from example
+# Edit .env with your OCI credentials and domain
+
+# Validate
+./validate-env.sh
+
+# Deploy
+make deploy         # Deploys infrastructure and application
 ```
+
+**Key Features:**
+- ✅ Centralized configuration via `.env` file
+- ✅ One-command deployment with Make
+- ✅ Automated infrastructure provisioning (Terraform)
+- ✅ Automated server configuration (Ansible)
+- ✅ Free tier optimized (ARM or x86)
+- ✅ Automatic SSL with Caddy
+- ✅ Security hardening included
+
+**Quick Reference:** [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
 
 > [!WARNING]
 > If you are updating an instance from before November 28, 2024, please consult the [notices section](#notices) at the bottom.
