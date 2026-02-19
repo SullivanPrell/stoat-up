@@ -1,0 +1,14 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http://local.stoat.chat"
+    },
+    {
+      "pattern": "^https://developers.revolt.chat"
+    },
+    {
+      "pattern": "^http://localhost"
+    }
+  ],
+  "aliveStatusCodes": [200, 206, 301, 302, 307, 308, 403, 405]
+}

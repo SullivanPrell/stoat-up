@@ -1,0 +1,26 @@
+# Docker Compose configuration for Cloudflare Tunnel
+# This file adds cloudflared to the stack when using Cloudflare Tunnel
+
+services:
+  # Cloudflare Tunnel - replaces Caddy when enabled
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - default
+    depends_on:
+      - web
+      - api
+      - events
+      - autumn
+      - january
+      - gifbox
+
+  # Disable Caddy when using Cloudflare Tunnel
+  caddy:
+    entrypoint: /bin/true
+    restart: "no"
+    ports: []

@@ -15,6 +15,47 @@ Self-hosting Stoat using Docker
 
 This repository contains configurations and instructions that can be used for deploying a full instance of Stoat, including the back-end, web front-end, file server, and metadata and image proxy.
 
+## 🚀 Deploy to Oracle Cloud Infrastructure (OCI) Free Tier
+
+**New!** This fork includes automated deployment to OCI free tier using Terraform, Docker Compose, and Ansible.
+
+👉 **[See DEPLOYMENT.md for complete deployment guide](DEPLOYMENT.md)**
+
+Quick deploy with centralized `.env` configuration:
+```bash
+# Setup
+make setup          # Creates .env from example
+# Edit .env with your OCI credentials and domain
+
+# Validate
+./validate-env.sh
+
+# Deploy
+make deploy         # Deploys infrastructure and application
+```
+
+**Optional: Use Cloudflare Tunnel** for zero-port-exposure deployment:
+```bash
+# Setup Cloudflare Tunnel (automatic SSL + DNS)
+make cloudflare-setup
+# Enable in .env: USE_CLOUDFLARE_TUNNEL=true
+# Deploy as normal
+
+👉 **[See CLOUDFLARE_TUNNEL.md for Cloudflare setup](CLOUDFLARE_TUNNEL.md)**
+```
+
+**Key Features:**
+- ✅ Centralized configuration via `.env` file
+- ✅ One-command deployment with Make
+- ✅ Automated infrastructure provisioning (Terraform)
+- ✅ Automated server configuration (Ansible)
+- ✅ Free tier optimized (ARM or x86)
+- ✅ Automatic SSL with Caddy **OR** Cloudflare Tunnel
+- ✅ Cloudflare Tunnel support (no port exposure, auto DNS)
+- ✅ Security hardening included
+
+**Quick Reference:** [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+
 > [!WARNING]
 > If you are updating an instance from before November 28, 2024, please consult the [notices section](#notices) at the bottom.
 
@@ -32,6 +73,7 @@ This repository contains configurations and instructions that can be used for de
 
 ## Table of Contents
 
+- [🚀 OCI Free Tier Deployment](#-deploy-to-oracle-cloud-infrastructure-oci-free-tier)
 - [Deployment](#deployment)
 - [Updating](#updating)
 - [Advanced Deployment](#advanced-deployment)

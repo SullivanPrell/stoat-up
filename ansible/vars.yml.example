@@ -1,0 +1,5 @@
+---
+# Example variables file
+# Copy this to vars.yml and customize
+
+domain_name: "stoat.example.com"
