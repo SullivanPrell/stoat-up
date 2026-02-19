@@ -1,0 +1,11 @@
+---
+- name: Configure OCI instance
+  hosts: oci
+  become: yes
+  vars:
+    domain: "{{ TF_VAR_domain }}"
+    app_name: "{{ TF_VAR_app_name | default('stoat-up') }}"
+  roles:
+    - common
+    - caddy
+    - app

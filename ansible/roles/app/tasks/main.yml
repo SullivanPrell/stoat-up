@@ -1,0 +1,49 @@
+---
+- name: Install Docker
+  apt:
+    name: docker.io
+    state: present
+    update_cache: yes
+
+- name: Install Docker Compose
+  get_url:
+    url: "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64"
+    dest: /usr/local/bin/docker-compose
+    mode: 'u+x,g+x,o+x'
+
+- name: Ensure Docker service is started and enabled
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+
+- name: Create app directory
+  file:
+    path: "/opt/{{ app_name }}"
+    state: directory
+
+- name: Copy application files
+  copy:
+    src: "{{ item }}"
+    dest: "/opt/{{ app_name }}/"
+  with_items:
+    - compose.yml
+    - livekit.yml
+    - generate_config.sh
+    - migrations/
+
+- name: Copy environment file
+  copy:
+    src: .env
+    dest: "/opt/{{ app_name }}/.env"
+
+- name: Run docker-compose
+  command: "docker-compose up -d"
+  args:
+    chdir: "/opt/{{ app_name }}/"
