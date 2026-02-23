@@ -1,0 +1,47 @@
+tunnel: ${CLOUDFLARE_TUNNEL_ID}
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # API routes
+  - hostname: ${STOAT_DOMAIN}
+    path: /api/*
+    service: http://api:14702
+    originRequest:
+      noTLSVerify: true
+
+  # WebSocket for events
+  - hostname: ${STOAT_DOMAIN}
+    path: /ws
+    service: http://events:14703
+    originRequest:
+      noTLSVerify: true
+
+  # Autumn file server
+  - hostname: ${STOAT_DOMAIN}
+    path: /autumn/*
+    service: http://autumn:14704
+    originRequest:
+      noTLSVerify: true
+
+  # January metadata proxy
+  - hostname: ${STOAT_DOMAIN}
+    path: /january/*
+    service: http://january:14705
+    originRequest:
+      noTLSVerify: true
+
+  # Gifbox Tenor proxy
+  - hostname: ${STOAT_DOMAIN}
+    path: /gifbox/*
+    service: http://gifbox:14706
+    originRequest:
+      noTLSVerify: true
+
+  # Web client (default/catch-all)
+  - hostname: ${STOAT_DOMAIN}
+    service: http://web:5000
+    originRequest:
+      noTLSVerify: true
+
+  # Catch-all rule (required)
+  - service: http_status:404

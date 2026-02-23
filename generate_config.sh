@@ -25,6 +25,7 @@ echo "api = \"https://$1/api\"" >> Revolt.toml
 echo "events = \"wss://$1/ws\"" >> Revolt.toml
 echo "autumn = \"https://$1/autumn\"" >> Revolt.toml
 echo "january = \"https://$1/january\"" >> Revolt.toml
+echo "gifbox = \"https://$1/gifbox\"" >> Revolt.toml
 
 # livekit hostname
 echo "" >> Revolt.toml

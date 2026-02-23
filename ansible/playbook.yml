@@ -1,0 +1,229 @@
+---
+- name: Deploy Stoat on OCI
+  hosts: stoat
+  become: yes
+  vars:
+    stoat_domain: "{{ lookup('env', 'STOAT_DOMAIN') | default(domain_name | default('stoat.example.com')) }}"
+    stoat_dir: "{{ lookup('env', 'STOAT_DIR') | default('/opt/stoat') }}"
+    
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        autoremove: yes
+        autoclean: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - git
+          - ufw
+          - fail2ban
+        state: present
+
+    - name: Configure UFW - Allow SSH
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+
+    - name: Configure UFW - Allow HTTP
+      ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+
+    - name: Configure UFW - Allow HTTPS
+      ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+
+    - name: Configure UFW - Set default deny
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: Start and enable fail2ban
+      systemd:
+        name: fail2ban
+        state: started
+        enabled: yes
+
+    - name: Create Docker keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install cloudflared (if using Cloudflare Tunnel)
+      block:
+        - name: Download cloudflared package
+          get_url:
+            url: "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}.deb"
+            dest: /tmp/cloudflared.deb
+            mode: '0644'
+
+        - name: Install cloudflared
+          apt:
+            deb: /tmp/cloudflared.deb
+            state: present
+
+        - name: Remove cloudflared package file
+          file:
+            path: /tmp/cloudflared.deb
+            state: absent
+      when: lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool
+
+    - name: Create Stoat directory
+      file:
+        path: "{{ stoat_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Clone Stoat repository
+      git:
+        repo: https://github.com/SullivanPrell/stoat-up.git
+        dest: "{{ stoat_dir }}"
+        version: main
+        force: yes
+
+    - name: Generate Stoat configuration
+      command: bash {{ stoat_dir }}/generate_config.sh {{ stoat_domain }}
+      args:
+        chdir: "{{ stoat_dir }}"
+        creates: "{{ stoat_dir }}/Revolt.toml"
+
+    - name: Setup Cloudflare Tunnel configuration
+      block:
+        - name: Copy compose.cloudflare.yml to server
+          copy:
+            src: "{{ playbook_dir }}/../compose.cloudflare.yml"
+            dest: "{{ stoat_dir }}/compose.cloudflare.yml"
+            mode: '0644'
+
+        - name: Copy cloudflared config template to server
+          copy:
+            src: "{{ playbook_dir }}/../cloudflared-config.yml.template"
+            dest: "{{ stoat_dir }}/cloudflared-config.yml.template"
+            mode: '0644'
+
+        - name: Install gettext-base for envsubst
+          apt:
+            name: gettext-base
+            state: present
+
+        - name: Create cloudflared config from template
+          shell: >
+            envsubst < {{ stoat_dir }}/cloudflared-config.yml.template
+            > {{ stoat_dir }}/cloudflared-config.yml
+          environment:
+            CLOUDFLARE_TUNNEL_ID: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_ID') | default('') }}"
+            STOAT_DOMAIN: "{{ stoat_domain }}"
+
+        - name: Create .cloudflared directory
+          file:
+            path: "{{ stoat_dir }}/.cloudflared"
+            state: directory
+            mode: '0755'
+
+        - name: Copy Cloudflare credentials (if exists locally)
+          copy:
+            src: "{{ playbook_dir }}/../.cloudflared/credentials.json"
+            dest: "{{ stoat_dir }}/.cloudflared/credentials.json"
+            mode: '0600'
+          ignore_errors: yes
+      when: lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool
+
+    - name: Create data directories
+      file:
+        path: "{{ stoat_dir }}/data/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - db
+        - rabbit
+        - minio
+        - caddy-data
+        - caddy-config
+
+    - name: Start Stoat services
+      command: docker compose up -d
+      args:
+        chdir: "{{ stoat_dir }}"
+      environment:
+        COMPOSE_PROJECT_NAME: stoat
+      when: not (lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool)
+
+    - name: Start Stoat services with Cloudflare Tunnel
+      command: docker compose -f compose.yml -f compose.cloudflare.yml up -d
+      args:
+        chdir: "{{ stoat_dir }}"
+      environment:
+        COMPOSE_PROJECT_NAME: stoat
+        CLOUDFLARE_TUNNEL_TOKEN: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_TOKEN') }}"
+        CLOUDFLARE_TUNNEL_ID: "{{ lookup('env', 'CLOUDFLARE_TUNNEL_ID') }}"
+        STOAT_DOMAIN: "{{ stoat_domain }}"
+      when: lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool
+
+    - name: Wait for services to be healthy
+      pause:
+        seconds: 30
+
+    - name: Display service status
+      command: docker compose ps
+      args:
+        chdir: "{{ stoat_dir }}"
+      register: docker_ps_output
+
+    - name: Show Docker Compose status
+      debug:
+        var: docker_ps_output.stdout_lines
+
+    - name: Display deployment information
+      debug:
+        msg:
+          - "Stoat has been deployed successfully!"
+          - "Domain: {{ 'https://' + stoat_domain if not (lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool) else stoat_domain }}"
+          - "Configuration file: {{ stoat_dir }}/Revolt.toml"
+          - "{{ 'Using Cloudflare Tunnel - No ports exposed!' if (lookup('env', 'USE_CLOUDFLARE_TUNNEL') | default('false') | bool) else 'Using Caddy for HTTPS' }}"
+          - "To check logs: cd {{ stoat_dir }} && docker compose logs -f"
+          - "To restart: cd {{ stoat_dir }} && docker compose restart"
+          - "To update: cd {{ stoat_dir }} && git pull && docker compose pull && docker compose up -d"

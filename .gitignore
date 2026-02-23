@@ -1,6 +1,7 @@
 data*
 
 .env
+!.env.example
 .env.web
 Revolt.toml
 livekit.yml
@@ -8,3 +9,32 @@ Revolt.toml.old
 livekit.yml.old
 
 compose.override.yml
+
+# Cloudflare Tunnel
+cloudflared-config.yml
+.cloudflared/
+credentials.json
+tunnel.json
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/*.tfvars
+!terraform/terraform.tfvars.example
+
+# Ansible
+ansible/inventory.ini
+ansible/vars.yml
+!ansible/inventory.ini.example
+!ansible/vars.yml.example
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+
+# OCI config
+.oci/

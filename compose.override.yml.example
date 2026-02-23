@@ -1,0 +1,56 @@
+# Docker Compose Override Example
+# Copy this to compose.override.yml and customize as needed
+#
+# This file can be used to override settings in compose.yml
+# without modifying the main compose file
+
+services:
+  # Example: Change Caddy ports for reverse proxy
+  # caddy:
+  #   ports:
+  #     - "8080:80"
+  #     - "8443:443"
+
+  # Example: Expose MongoDB for external access (INSECURE!)
+  # database:
+  #   ports:
+  #     - "27017:27017"
+
+  # Example: Use older MongoDB for compatibility
+  # database:
+  #   image: mongo:4.4
+
+  # Example: Add resource limits
+  # api:
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '1'
+  #         memory: 1G
+  #       reservations:
+  #         cpus: '0.5'
+  #         memory: 512M
+
+  # Example: Add custom environment variables
+  # api:
+  #   environment:
+  #     - NODE_ENV=production
+  #     - LOG_LEVEL=info
+
+  # Example: Mount additional volumes
+  # api:
+  #   volumes:
+  #     - ./custom-config.toml:/custom-config.toml:ro
+
+  # Example: Use different image tags
+  # api:
+  #   image: ghcr.io/revoltchat/server:latest
+
+  # Example: Add health checks
+  # web:
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:5000"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
